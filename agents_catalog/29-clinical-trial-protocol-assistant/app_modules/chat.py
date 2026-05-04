@@ -66,7 +66,7 @@ class ChatManager:
                 params={"qualifier": endpoint_name},
                 headers=headers,
                 json=body,
-                timeout=100,
+                timeout=600,
                 stream=True,
             )
             last_data = False

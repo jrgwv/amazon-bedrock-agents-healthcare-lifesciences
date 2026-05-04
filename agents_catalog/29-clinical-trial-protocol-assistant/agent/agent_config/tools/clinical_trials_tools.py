@@ -209,7 +209,7 @@ def search_clinical_trials(disease_area: str, trial_phase: str) -> dict:
             f"AREA[Phase]{canonical_phase} AND AREA[OverallStatus]COMPLETED"
         ),
         "sort": "@relevance",
-        "pageSize": "20",
+        "pageSize": "10",
         "format": "json",
     }
 
@@ -276,8 +276,12 @@ def search_clinical_trials(disease_area: str, trial_phase: str) -> dict:
             if o.get("measure")
         ]
 
-        eligibility_criteria = (
+        eligibility_criteria_raw = (
             protocol.get("eligibilityModule", {}).get("eligibilityCriteria", None)
+        )
+        # Truncate to reduce LLM context size; analyze_protocols parses the full text
+        eligibility_criteria = (
+            eligibility_criteria_raw[:500] + "..." if eligibility_criteria_raw and len(eligibility_criteria_raw) > 500 else eligibility_criteria_raw
         )
 
         enrollment = (

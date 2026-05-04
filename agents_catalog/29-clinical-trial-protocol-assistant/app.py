@@ -6,6 +6,7 @@ import uuid
 from typing import Dict, Iterator, List
 
 import boto3
+from botocore.config import Config
 import streamlit as st
 from streamlit.logger import get_logger
 
@@ -250,7 +251,11 @@ def invoke_agent_streaming(
 ) -> Iterator[str]:
     """Invoke agent and yield streaming response chunks"""
     try:
-        agentcore_client = boto3.client("bedrock-agentcore", region_name=region)
+        agentcore_client = boto3.client(
+            "bedrock-agentcore",
+            region_name=region,
+            config=Config(read_timeout=600, connect_timeout=10, retries={"max_attempts": 0}),
+        )
 
         boto3_response = agentcore_client.invoke_agent_runtime(
             agentRuntimeArn=agent_arn,

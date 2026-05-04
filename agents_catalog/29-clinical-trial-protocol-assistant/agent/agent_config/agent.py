@@ -7,6 +7,7 @@ that drives the Strands agent loop.
 
 import logging
 from typing import Optional
+from botocore.config import Config as BotoConfig
 from strands import Agent
 from strands.models import BedrockModel
 from .memory_hook_provider import MemoryHook
@@ -63,7 +64,10 @@ class ClinicalTrialAgent:
         bedrock_model_id: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
     ):
         self.model_id = bedrock_model_id
-        self.model = BedrockModel(model_id=self.model_id)
+        self.model = BedrockModel(
+            model_id=self.model_id,
+            boto_client_config=BotoConfig(read_timeout=300, connect_timeout=10),
+        )
         self.tools = [
             search_clinical_trials,
             analyze_protocols,
