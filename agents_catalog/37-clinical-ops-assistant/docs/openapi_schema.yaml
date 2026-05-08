@@ -1,0 +1,422 @@
+openapi: 3.0.3
+info:
+  title: Clinical Ops Assistant — Veeva Vault Action Group
+  description: |
+    Read-only operations for a Bedrock Agent to answer clinical operations questions
+    against a Veeva Vault Clinical environment (CTMS / eTMF) via the Vault REST API v26.1.
+
+    Authentication is handled inside the Lambda using a session token stored in DynamoDB
+    and refreshed from credentials in AWS Secrets Manager. Callers do NOT pass auth.
+
+    All operations are read-only. Write operations are intentionally excluded; users who
+    need to change Vault data are directed back to the Vault UI.
+  version: 1.0.0
+  contact:
+    name: Clinical Ops Assistant — internal
+servers:
+  - url: https://invoke.local
+    description: Invoked via AWS Bedrock Agent action group; not directly addressable.
+
+paths:
+  /studies:
+    get:
+      operationId: listStudies
+      summary: List clinical studies the user has access to.
+      description: |
+        Returns a list of studies (Vault object: study__v) with key metadata.
+        Use this when the user asks generic questions like
+        "what studies do I have access to" or "show me all active phase 3 studies".
+        Filter by status or phase when the user is specific.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter by study status (e.g., active__c, planning__c, closed__c).
+          schema:
+            type: string
+        - name: phase
+          in: query
+          required: false
+          description: Filter by phase (e.g., "Phase 1", "Phase 2", "Phase 3", "Phase 4").
+          schema:
+            type: string
+        - name: therapeutic_area
+          in: query
+          required: false
+          description: Filter by therapeutic area name.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of studies to return. Defaults to 25, max 100.
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+      responses:
+        '200':
+          description: List of matching studies.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyList'
+
+  /studies/{studyName}:
+    get:
+      operationId: getStudyByName
+      summary: Get a single study by its study name (e.g., "BMS-986365-001").
+      description: |
+        Returns full metadata for one study, including status, phase, sponsor,
+        indication, milestones, planned vs actual enrollment, and key dates.
+        Use this when the user names a specific study.
+      parameters:
+        - name: studyName
+          in: path
+          required: true
+          description: The Vault study name (the human-readable identifier, not the internal Vault ID).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Study detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyDetail'
+        '404':
+          description: No study with that name exists in Vault, or the user does not have permission to see it.
+
+  /studies/{studyName}/sites:
+    get:
+      operationId: listSitesForStudy
+      summary: List investigator sites associated with a study.
+      description: |
+        Returns sites (Vault object: study_site__v) participating in the study,
+        including site number, principal investigator, country, status, and
+        enrollment metrics (planned, screened, randomized, active).
+        Use this when the user asks about site performance, enrollment, or activation status.
+      parameters:
+        - name: studyName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: country
+          in: query
+          required: false
+          description: Filter by country (ISO 3166-1 alpha-2 code, e.g., "US", "DE").
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          description: Filter by site status (e.g., active__c, screening__c, closed__c).
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+      responses:
+        '200':
+          description: List of sites for the study.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiteList'
+
+  /studies/{studyName}/milestones:
+    get:
+      operationId: listMilestonesForStudy
+      summary: List study milestones with planned vs actual dates.
+      description: |
+        Returns key milestones (Vault object: milestone__v) for a study, including
+        planned and actual dates and current status (on-track, at-risk, missed).
+        Use this when the user asks about study timeline, key dates, or milestone slip.
+      parameters:
+        - name: studyName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          description: Filter by milestone status (e.g., on_track__c, at_risk__c, missed__c, complete__c).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of milestones.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MilestoneList'
+
+  /documents/search:
+    get:
+      operationId: searchDocuments
+      summary: Search the Vault document repository (eTMF) by query and filters.
+      description: |
+        Searches documents in the Vault eTMF using a Vault Query Language (VQL)
+        backed search. Returns document metadata only (title, type, study, site,
+        version, expiration, last modified). Use this for questions like
+        "find the latest IB for study X" or "show me all expired site contracts in Germany".
+        DOES NOT return document file contents — use getDocumentMetadata to get a Vault
+        deep link the user can open.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Free-text search across document titles and metadata.
+          schema:
+            type: string
+        - name: study_name
+          in: query
+          required: false
+          description: Restrict to documents associated with this study.
+          schema:
+            type: string
+        - name: document_type
+          in: query
+          required: false
+          description: Vault document type (e.g., "Investigator Brochure", "Site Contract", "Monitoring Visit Report").
+          schema:
+            type: string
+        - name: expiring_within_days
+          in: query
+          required: false
+          description: Filter to documents expiring within this many days from today.
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+      responses:
+        '200':
+          description: Matching document metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentList'
+
+  /documents/{documentId}:
+    get:
+      operationId: getDocumentMetadata
+      summary: Get full metadata for a single document and a Vault UI deep link.
+      description: |
+        Returns metadata for one document including title, type, version, study,
+        site (if applicable), author, last modified, status, expiration date,
+        and a deep link the user can click to open it in the Vault UI.
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          description: The Vault document ID (e.g., "0PR000000000Y01").
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentDetail'
+        '404':
+          description: Document not found or access denied.
+
+components:
+  schemas:
+    Study:
+      type: object
+      properties:
+        study_name:
+          type: string
+          example: "BMS-986365-001"
+        protocol_number:
+          type: string
+        title:
+          type: string
+        phase:
+          type: string
+          example: "Phase 3"
+        status:
+          type: string
+          example: "active__c"
+        therapeutic_area:
+          type: string
+        indication:
+          type: string
+        sponsor:
+          type: string
+        first_subject_first_visit:
+          type: string
+          format: date
+          nullable: true
+        last_subject_last_visit:
+          type: string
+          format: date
+          nullable: true
+
+    StudyDetail:
+      allOf:
+        - $ref: '#/components/schemas/Study'
+        - type: object
+          properties:
+            planned_enrollment:
+              type: integer
+            actual_enrollment:
+              type: integer
+            site_count_active:
+              type: integer
+            site_count_total:
+              type: integer
+            vault_url:
+              type: string
+              description: Deep link to the study record in the Vault UI.
+
+    StudyList:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Total matching studies (may exceed `studies` length if limit was applied).
+        studies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Study'
+
+    Site:
+      type: object
+      properties:
+        site_number:
+          type: string
+          example: "US-042"
+        site_name:
+          type: string
+        principal_investigator:
+          type: string
+        country:
+          type: string
+          example: "US"
+        status:
+          type: string
+        planned_enrollment:
+          type: integer
+        screened:
+          type: integer
+        randomized:
+          type: integer
+        active_subjects:
+          type: integer
+        activation_date:
+          type: string
+          format: date
+          nullable: true
+        vault_url:
+          type: string
+
+    SiteList:
+      type: object
+      properties:
+        study_name:
+          type: string
+        total:
+          type: integer
+        sites:
+          type: array
+          items:
+            $ref: '#/components/schemas/Site'
+
+    Milestone:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Database Lock"
+        type:
+          type: string
+        planned_date:
+          type: string
+          format: date
+        actual_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          example: "at_risk__c"
+        days_variance:
+          type: integer
+          description: Negative = ahead of plan, positive = behind plan, null = not yet due.
+          nullable: true
+
+    MilestoneList:
+      type: object
+      properties:
+        study_name:
+          type: string
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Milestone'
+
+    Document:
+      type: object
+      properties:
+        document_id:
+          type: string
+        title:
+          type: string
+        document_type:
+          type: string
+        version:
+          type: string
+          example: "3.0"
+        study_name:
+          type: string
+          nullable: true
+        site_number:
+          type: string
+          nullable: true
+        last_modified:
+          type: string
+          format: date-time
+        expiration_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          example: "Effective"
+
+    DocumentDetail:
+      allOf:
+        - $ref: '#/components/schemas/Document'
+        - type: object
+          properties:
+            author:
+              type: string
+            classification:
+              type: string
+            vault_url:
+              type: string
+              description: Deep link to open the document in the Vault UI.
+
+    DocumentList:
+      type: object
+      properties:
+        total:
+          type: integer
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'

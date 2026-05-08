@@ -1,0 +1,7 @@
+{
+  "app": "npx ts-node --prefer-ts-exts bin/app.ts",
+  "context": {
+    "vaultBaseUrl": "https://CUSTOMER.veevavault.com",
+    "vaultApiVersion": "v26.1"
+  }
+}
