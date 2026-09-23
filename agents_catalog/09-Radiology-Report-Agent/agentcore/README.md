@@ -10,6 +10,23 @@ Migrated from the notebook-driven Bedrock Agent + Lambda action group in the
 clients plus `BATCH_JOB_*` environment variables; that dead wiring was dropped in
 this migration.
 
+## Architecture
+
+```mermaid
+sequenceDiagram
+    actor U as Radiologist
+    participant R as AgentCore Runtime<br/>(Strands Agent)
+    participant S as S3 (ACR PDFs)
+    participant B as Bedrock<br/>(Claude Sonnet 5)
+
+    U->>R: prompt with radiology report
+    R->>S: download_guidance_document("Chest")
+    S-->>R: ACR guideline PDF(s) staged
+    R->>B: run_validator — converse(report + PDF)
+    B-->>R: terse actionable feedback
+    R-->>U: ACR validation feedback
+```
+
 ## Tools
 
 | Tool | Purpose |

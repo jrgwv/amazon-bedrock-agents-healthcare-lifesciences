@@ -17,6 +17,16 @@ This agent runs on the **Amazon Bedrock AgentCore runtime** using the **Strands
 SDK**. See [`agentcore/`](./agentcore/) for the implementation, deployment, and
 tests.
 
+```mermaid
+flowchart LR
+    User([Radiologist]) -->|report| Runtime[AgentCore Runtime<br/>Strands Agent]
+    Runtime -->|1. download_guidance_document| S3[(S3 bucket<br/>ACR guideline PDFs)]
+    S3 -->|guideline PDF| Runtime
+    Runtime -->|2. run_validator<br/>converse + PDF| Bedrock[Amazon Bedrock<br/>Claude Sonnet 5]
+    Bedrock -->|actionable feedback| Runtime
+    Runtime -->|validation feedback| User
+```
+
 | Tool | Purpose |
 |------|---------|
 | `download_guidance_document(anatomical_structure)` | Downloads the ACR guidance PDF(s) matching a modality/anatomical structure (e.g. `Chest`) from S3. |
