@@ -42,6 +42,8 @@ def _find_agentcore_cli() -> str:
 
 def _run(cmd: str, check: bool = True) -> subprocess.CompletedProcess:
     """Run a command and stream output."""
+    # nosec B603: cmd is built from constant CLI strings and controlled flags,
+    # not untrusted input; .split() avoids a shell entirely.
     result = subprocess.run(cmd.split(), capture_output=False, text=True)  # nosec B603
     if check and result.returncode != 0:
         sys.exit(result.returncode)
@@ -60,7 +62,8 @@ def deploy(dry_run, verbose, target):
         click.echo("Error: agentcore CLI not found. Install with: npm install -g @aws/agentcore")
         sys.exit(1)
 
-    # Verify version
+    # Verify version. nosec B603: cli comes from shutil.which()/npx, not user
+    # input, and is run without a shell.
     result = subprocess.run(f"{cli} --version".split(), capture_output=True, text=True)  # nosec B603
     click.echo(f"Using agentcore CLI v{result.stdout.strip()}")
 
