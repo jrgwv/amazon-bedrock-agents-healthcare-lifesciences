@@ -21,7 +21,7 @@ from strands.models import BedrockModel
 
 logger = logging.getLogger(__name__)
 
-MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+MODEL_ID = os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-5")
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "radiologyreport-validator")
 
 # Directory where guideline PDFs are staged between download and validation.
@@ -161,8 +161,9 @@ def run_validator(report: str) -> str:
             ],
         }
     ]
-    # Claude Sonnet 4.5 rejects temperature and top_p together; keep temperature only.
-    inference_config = {"maxTokens": 200, "temperature": 0.3}
+    # Sonnet 5 is a reasoning model; give it enough budget to emit a text answer
+    # after any internal reasoning tokens.
+    inference_config = {"maxTokens": 2000}
 
     client = boto3.client("bedrock-runtime")
     try:
@@ -175,7 +176,17 @@ def run_validator(report: str) -> str:
         logger.error(f"Error during report validation: {e}")
         return f"Error validating report: {e}"
 
-    return model_response["output"]["message"]["content"][0]["text"]
+    # Sonnet 5 may return non-text content blocks (e.g. reasoning) before the text;
+    # scan for the first text block, falling back to reasoning text if present.
+    content_blocks = model_response["output"]["message"]["content"]
+    for block in content_blocks:
+        if "text" in block:
+            return block["text"]
+    for block in content_blocks:
+        reasoning = block.get("reasoningContent", {}).get("reasoningText", {}).get("text")
+        if reasoning:
+            return reasoning
+    return "No text feedback was returned by the model."
 
 
 def create_agent() -> Agent:

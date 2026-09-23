@@ -28,7 +28,7 @@ to the bucket, keying each object so the anatomical structure appears in the key
 
 | Env var | Default | Description |
 |---------|---------|-------------|
-| `MODEL_ID` | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | Bedrock model used for validation. |
+| `MODEL_ID` | `global.anthropic.claude-sonnet-5` | Bedrock model (global inference profile) used for validation. |
 | `BUCKET_NAME` | `radiologyreport-validator` | S3 bucket holding ACR guideline PDFs. |
 | `GUIDANCE_DIR` | `<tmpdir>/acr_guidance` | Local directory where guideline PDFs are staged. |
 

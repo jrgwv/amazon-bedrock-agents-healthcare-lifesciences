@@ -97,7 +97,29 @@ class TestRunValidator(unittest.TestCase):
         assert kwargs["modelId"] == agent_module.MODEL_ID
         content = kwargs["messages"][0]["content"]
         assert content[0]["document"]["format"] == "pdf"
-        assert kwargs["inferenceConfig"]["maxTokens"] == 200
+        assert kwargs["inferenceConfig"]["maxTokens"] == 2000
+
+    @patch("agent.agent_config.agent.boto3.client")
+    @patch("builtins.open", new_callable=unittest.mock.mock_open, read_data=b"%PDF-1.4 fake")
+    @patch("os.path.isdir", return_value=True)
+    @patch("os.listdir", return_value=["ACR_Chest.pdf"])
+    def test_skips_non_text_content_block(self, _mock_listdir, _mock_isdir, _mock_open, mock_boto):
+        # Sonnet 5 may emit a reasoning block before the text block.
+        mock_client = MagicMock()
+        mock_client.converse.return_value = {
+            "output": {
+                "message": {
+                    "content": [
+                        {"reasoningContent": {"reasoningText": {"text": "thinking"}}},
+                        {"text": "Add an impression section."},
+                    ]
+                }
+            }
+        }
+        mock_boto.return_value = mock_client
+
+        result = run_validator(report="Findings: clear lungs.")
+        assert result == "Add an impression section."
 
     @patch("agent.agent_config.agent.boto3.client")
     @patch("builtins.open", new_callable=unittest.mock.mock_open, read_data=b"%PDF-1.4 fake")
