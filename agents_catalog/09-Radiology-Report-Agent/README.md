@@ -39,6 +39,12 @@ bucket the agent reads from (see [`agentcore/README.md`](./agentcore/README.md)
 for bucket configuration and IAM requirements), keying each object so the
 anatomical structure appears in the key (e.g. `Chest/ACR_Chest.pdf`).
 
+## Deploy
+
+Full deployment steps — S3 setup, `agentcore configure` / `deploy`, execution-role
+IAM, and `agentcore invoke` — are documented in
+[`agentcore/README.md`](./agentcore/README.md#deploy).
+
 ## Migration note
 
 This agent was migrated from a notebook-driven Amazon Bedrock Agent with a Lambda
