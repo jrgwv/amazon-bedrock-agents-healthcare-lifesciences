@@ -161,7 +161,8 @@ def run_validator(report: str) -> str:
             ],
         }
     ]
-    inference_config = {"maxTokens": 200, "topP": 0.1, "temperature": 0.3}
+    # Claude Sonnet 4.5 rejects temperature and top_p together; keep temperature only.
+    inference_config = {"maxTokens": 200, "temperature": 0.3}
 
     client = boto3.client("bedrock-runtime")
     try:
